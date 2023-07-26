@@ -153,3 +153,41 @@ grep -i -E 'succeeded|failed' star1-array.sh.o* | awk '{ print $5 }' | sort | un
      90 succeeded.
 cd ..
 ```
+
+### Remap using discovered splice junctions
+
+Download star2 job files
+```
+cd $gitdir/qsub
+wget https://raw.githubusercontent.com/richysix/uge-job-scripts/8d9b85ebc9e1ded8c1ba315c5d4b627f0e4a2b9c/star2-array.sh
+cd ../scripts/
+wget https://raw.githubusercontent.com/richysix/uge-job-scripts/8d9b85ebc9e1ded8c1ba315c5d4b627f0e4a2b9c/star2.sh
+```
+
+Copy file of fastq files to star2 directory
+```
+cd $basedir
+dir=star2
+mkdir -p $dir
+cp star1/fastq.tsv $dir
+```
+
+Run STAR as array job
+```
+cd $dir
+# symlink star2 script
+ln -s $gitdir/scripts/star2.sh star2.sh
+
+qsub -t 1-${num_tasks} $gitdir/qsub/star2-array.sh
+```
+
+Check jobs completed
+```
+grep -i -E 'succeeded|failed' star2-array.sh.o* | awk '{ print $5 }' | sort | uniq -c
+     90 SUCCEEDED.
+```
+Check error files
+```
+cat star2-array.sh.e* | wc -l
+0
+```
