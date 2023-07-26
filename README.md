@@ -191,3 +191,19 @@ Check error files
 cat star2-array.sh.e* | wc -l
 0
 ```
+
+### DESeq2
+
+Get Ensembl e109 annotation
+```
+# download scripts
+cd $gitdir/qsub
+wget https://raw.githubusercontent.com/richysix/uge-job-scripts/50a25a47cce6654f860ff350dfe6466e9f1c2da0/get_ensembl_gene_annotation.sh 
+cd $gitdir/scripts
+wget https://raw.githubusercontent.com/iansealy/bio-misc/4e27d60323907d55d37a1ec8f468ca771f542f78/get_ensembl_gene_annotation.pl
+
+mkdir annotation
+qsub  qsub/get_ensembl_gene_annotation.sh -e 109 -s 'Danio rerio' \
+-o annotation/annotation.txt -f scripts/get_ensembl_gene_annotation.pl
+```
+
