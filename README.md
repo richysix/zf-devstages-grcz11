@@ -93,3 +93,26 @@ cd $gitdir/qsub
 https://raw.githubusercontent.com/richysix/uge-job-scripts/8d9b85ebc9e1ded8c1ba315c5d4b627f0e4a2b9c/curl-file-download-array.sh
 qsub -t 1-${num_tasks} $gitdir/qsub/curl-file-download-array.sh
 ```
+
+Check md5sums
+Create a file of checksums and filenames
+```
+paste <(cut -f10 ../ena-sample-names.tsv | sed -e 's/;/\n/') \
+<(cut -f11 ../ena-sample-names.tsv | sed -e 's/;/\n/') | \
+grep -v fastq_ftp | sed -e 's|\t.*/|  |' > md5sum.txt
+```
+
+Download check-md5sum and run job
+```
+cd $gitdir/qsub
+wget https://raw.githubusercontent.com/richysix/uge-job-scripts/8d9b85ebc9e1ded8c1ba315c5d4b627f0e4a2b9c/check-md5sums.sh
+cd $basedir/$dir
+qsub ../qsub/check-md5sums.sh
+```
+
+Check there are no lines in md5sum.out
+Lines are only output if the checksum doesn't match
+```
+wc -l md5sum.out 
+0 md5sum.out
+```
