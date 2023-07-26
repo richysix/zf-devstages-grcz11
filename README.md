@@ -8,7 +8,7 @@ to GRCz11.
 Environment variables
 ```
 gitdir=$HOME/checkouts/zf-devstages-grcz11
-basedir=/data/scratch/$USER/zf-stages-grcz11/109/
+basedir=/data/scratch/$USER/zf-stages-grcz11/109
 ```
 
 Download bash_functions.sh and place in path
@@ -192,7 +192,7 @@ cat star2-array.sh.e* | wc -l
 0
 ```
 
-### DESeq2
+## DESeq2
 
 Get Ensembl e109 annotation
 ```
@@ -207,3 +207,32 @@ qsub  qsub/get_ensembl_gene_annotation.sh -e 109 -s 'Danio rerio' \
 -o annotation/annotation.txt -f scripts/get_ensembl_gene_annotation.pl
 ```
 
+### Run DESeq2 to get normalised counts
+
+Run DESeq2 with samples divided into Maternal and Zygotic. Split is irrelevant,
+but the DESeq2 script requires two conditions to run.
+
+Create samples file
+```
+dir=deseq2-all
+mkdir $dir
+awk -F"\t" '{ print $7 "\t" $6 }' zfs-rnaseq-samples.tsv | grep -v sampleName > $dir/samples.tsv
+```
+
+Create file of commands to run with Rscript
+```
+con=$( cut -f4,6 zfs-rnaseq-samples.tsv | grep -v condition | uniq | sed -e 's|ZFS:0*||' | \
+awk '{if($1 <= 11){ print $2 }}' | tr '\n' ',' | sed -e 's|,$||' )
+exp=$( cut -f4,6 zfs-rnaseq-samples.tsv | grep -v condition | uniq | sed -e 's|ZFS:0*||' | \
+awk '{if($1 > 11){ print $2 }}' | tr '\n' ',' | sed -e 's|,$||' )
+echo "Rscript $gitdir/scripts/deseq2.R -s $dir/samples.tsv -e $exp -c $con \
+-a $basedir/annotation/annotation.txt -d $basedir/star2 -o $dir" > deseq2.txt
+```
+
+Run rscript job script
+```
+cd $gitdir/qsub
+wget https://raw.githubusercontent.com/richysix/uge-job-scripts/5161dae7f8688aca015ea809af0ce231790e9e60/rscript-array.sh
+cd $basedir
+qsub -t 1 -o $dir/deseq-all.o -e $dir/deseq-all.e $gitdir/qsub/rscript-array.sh deseq2.txt deseq2
+```
