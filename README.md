@@ -116,3 +116,40 @@ Lines are only output if the checksum doesn't match
 wc -l md5sum.out 
 0 md5sum.out
 ```
+
+## Run STAR
+
+Create file of samples to fastq files
+```
+cd ..
+dir=star1
+mkdir -p $dir
+grep -v 'sample_accession' ena-sample-names.tsv | perl -ane 'push @{$h{$F[6]}}, $F[8]; END { foreach my $k (keys %h)
+{ printf "%s\t%s\t%s\n", $k, (join ",", map { "../fastq/${_}_1.fastq.gz" } sort @{$h{$k}}), (join ",", map { "../fastq/${_}_2.fastq.gz" } sort @{$h{$k}}) } }' | \
+sort -V > $dir/fastq.tsv
+```
+
+Download star1 job files
+```
+cd $gitdir/qsub
+wget https://raw.githubusercontent.com/richysix/uge-job-scripts/8d9b85ebc9e1ded8c1ba315c5d4b627f0e4a2b9c/star1-array.sh
+cd ../scripts/
+wget https://raw.githubusercontent.com/richysix/uge-job-scripts/8d9b85ebc9e1ded8c1ba315c5d4b627f0e4a2b9c/star1.sh
+```
+
+Run all samples as array job
+```
+cd $basedir/$dir
+# symlink star1 script
+ln -s $gitdir/scripts/star1.sh star1.sh
+# run job
+num_tasks=$( wc -l fastq.tsv | awk '{ print $1 }' )
+qsub -t 1-${num_tasks} $gitdir/qsub/star1-array.sh
+```
+
+Check whether they succeeded or failed
+```
+grep -i -E 'succeeded|failed' star1-array.sh.o* | awk '{ print $5 }' | sort | uniq -c
+     90 succeeded.
+cd ..
+```
