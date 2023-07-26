@@ -5,15 +5,26 @@ to GRCz11.
 
 ## Setup
 
+Environment variables
 ```
 gitdir=$HOME/checkouts/zf-devstages-grcz11
 basedir=/data/scratch/$USER/zf-stages-grcz11/109/
 ```
 
-### Create directories
+Download bash_functions.sh and place in path
+```
+cd $HOME/bin # This needs to be one of the directories in the $PATH variable
+wget https://raw.githubusercontent.com/richysix/bioinf-gen/master/bash_functions.sh
+```
+
+Create directories
 
 ```
 mkdir -p $basedir $gitdir/scripts $gitdir/qsub
+# set up symlinks
+cd $basedir
+ln -s $gitdir/qsub qsub
+ln -s $gitdir/scripts scripts
 ```
 
 ## Index genome with STAR
