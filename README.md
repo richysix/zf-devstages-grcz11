@@ -236,3 +236,51 @@ wget https://raw.githubusercontent.com/richysix/uge-job-scripts/5161dae7f8688aca
 cd $basedir
 qsub -t 1 -o $dir/deseq-all.o -e $dir/deseq-all.e $gitdir/qsub/rscript-array.sh deseq2.txt deseq2
 ```
+
+### Archive mapped bams
+
+Make file of bam files names with ZFS stage cram file names
+```
+cut -f4,7 zfs-rnaseq-samples.tsv | grep -v condition | \
+sed -e 's|-\([1-5]\)$|-\1\t\1|; s|ZFS:|zfs-|; s|00000||;' | \
+awk -F"\t" '{ print "star2/" $2 "/Aligned.sortedByCoord.out.bam\t" "'$SHARED'" "/genomes/GRCz11/GRCz11.fa\tstar2/" $1 "-" $3 ".cram" }' > bam2cram.txt
+```
+
+Run bam2cram array job
+```
+# symlink to bam2cram script
+ln -s ~/checkouts/uge-job-scripts/bam2cram.sh bam2cram.sh
+qsub -t 1-90 ~/checkouts/uge-job-scripts/bam2cram-array.sh bam2cram.txt
+
+grep -ihE 'SUCCEEDED|FAILED' bam2cram-array.sh.[oe]30790* | awk '{print $3}' | sort | uniq -c
+     90 SUCCEEDED.
+```
+
+Copy to archive
+```
+echo '#!/usr/bin/env bash
+#$ -cwd
+#$ -pe smp 1
+#$ -l h_rt=1:0:0
+#$ -l h_vmem=1G
+#$ -o rclone-copy-star2.o
+#$ -e rclone-copy-star2.e
+
+module load rclone
+rclone copy --filter "+ *cram*" --filter "- *" star2/ sharepoint-qmul:Projects/zf-stages-grcz11/e109/star2/
+rclone copy /data/SBBS-BuschLab/genomes/GRCz11/GRCz11.fa sharepoint-qmul:Projects/zf-stages-grcz11/e109/' > qsub/rclone-copy-star2.sh
+
+qsub qsub/rclone-copy-star2.sh
+```
+
+Check files transferred properly
+```
+rclone check --filter "+ *cram*" --filter "- *" star2/ sharepoint-qmul:Projects/zf-stages-grcz11/e109/star2/
+2023/08/30 12:18:18 NOTICE: OneDrive root 'Projects/zf-stages-grcz11/e109/star2': 0 differences found
+2023/08/30 12:18:18 NOTICE: OneDrive root 'Projects/zf-stages-grcz11/e109/star2': 180 matching files
+
+# check file sizes match
+rclone ls sharepoint-qmul:Documents/Projects/zf-stages-grcz11/e109/star2/ > transferred-files.txt
+ls -l star2/*.cram* | sed -e 's|star2/||' | sort -k9,9 | join -1 9 -2 2 - <( sort -k2,2 transferred-files.txt ) | awk '{ if($6 != $10 ){ print $0 } }'
+```
+
