@@ -284,3 +284,15 @@ rclone ls sharepoint-qmul:Documents/Projects/zf-stages-grcz11/e109/star2/ > tran
 ls -l star2/*.cram* | sed -e 's|star2/||' | sort -k9,9 | join -1 9 -2 2 - <( sort -k2,2 transferred-files.txt ) | awk '{ if($6 != $10 ){ print $0 } }'
 ```
 
+## Make correlation network and cluster with MCL
+
+```
+cd scripts
+wget https://raw.githubusercontent.com/richysix/bioinf-gen/7fb845868624d0fbd563d116e674b874c26842e2/create_cor_network.R
+
+cd $basedir/$dir
+echo "Rscript $gitdir/scripts/create_cor_network.R samples.tsv all.tsv \
+--threshold 0.7 --expansion 2 --inflation 1.4 \
+--output all-cor-long-70.tsv --clusters_file all-cor-long-70-clusters.tsv" > cor.txt
+qsub -t 1 -l h_vmem=32G -o cor.o -e cor.e $gitdir/qsub/rscript-array.sh cor.txt cor
+```
