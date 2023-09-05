@@ -415,3 +415,27 @@ Total number of nodes: 26007
 ```
 
 Try k-NN 400. It keeps ~6% edges and has median node degree ~100
+
+```
+knn_threshold=400
+threshold=0.7
+threshold_suffix=$( echo $threshold | perl -lane 'print $F[0] * 100' )
+for INFLATION in 1.8 2.0 2.2 4.0
+do
+  qsub -o mcl-clustering-$threshold_suffix-knn${knn_threshold}-$INFLATION.o \
+  -e mcl-clustering-$threshold_suffix-knn${knn_threshold}-$INFLATION.e \
+  $gitdir/qsub/run-mcl-clustering.sh -i $INFLATION \
+  -o all-cor-${threshold_suffix}-knn${knn_threshold} -t $threshold all-cor-long-${threshold_suffix}.tsv gene-names.tsv
+done
+```
+
+```
+clm info all-cor-70-knn400.mci all-cor-70-knn400.mci.I[0-9][0-9]
+efficiency=0.15629 massfrac=0.83000 areafrac=0.07443  source=all-cor-70-knn400.mci.I14 clusters=1384 max=4108  ctr=1936.5 avg=18.8 min=1 DGI=1330 TWI=4 TWL=2371 sgl=907 qrt=1127
+===
+efficiency=0.19235 massfrac=0.77197 areafrac=0.04415  source=all-cor-70-knn400.mci.I16 clusters=1619 max=2576  ctr=1149.2 avg=16.1 min=1 DGI=1385 TWI=7 TWL=1152 sgl=909 qrt=1254
+===
+efficiency=0.27028 massfrac=0.66856 areafrac=0.01725  source=all-cor-70-knn400.mci.I20 clusters=2261 max=1287  ctr=449.6 avg=11.5 min=1 DGI=1157 TWI=18 TWL=516 sgl=1026 qrt=1797
+===
+efficiency=0.26274 massfrac=0.34114 areafrac=0.00248  source=all-cor-70-knn400.mci.I40 clusters=7212 max=411  ctr=65.5 avg=3.6 min=1 DGI=411 TWI=255 TWL=14 sgl=4384 qrt=6518
+```
