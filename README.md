@@ -288,11 +288,61 @@ ls -l star2/*.cram* | sed -e 's|star2/||' | sort -k9,9 | join -1 9 -2 2 - <( sor
 
 ```
 cd scripts
-wget https://raw.githubusercontent.com/richysix/bioinf-gen/7fb845868624d0fbd563d116e674b874c26842e2/create_cor_network.R
+wget https://raw.githubusercontent.com/richysix/bioinf-gen/f13590412d28c443c700f270d90db8923f13f552/create_cor_network.R
 
 cd $basedir/$dir
 echo "Rscript $gitdir/scripts/create_cor_network.R samples.tsv all.tsv \
 --threshold 0.7 --expansion 2 --inflation 1.4 \
 --output all-cor-long-70.tsv --clusters_file all-cor-long-70-clusters.tsv" > cor.txt
-qsub -t 1 -l h_vmem=32G -o cor.o -e cor.e $gitdir/qsub/rscript-array.sh cor.txt cor
+qsub -t 1 -l h_vmem=128G -o cor.o -e cor.e $gitdir/qsub/rscript-array.sh cor.txt cor
 ```
+
+Decide on best value of correlation coeff cut-off to use
+```
+qlogin -l h_vmem=8G
+
+cd /data/scratch/bty114/zf-stages-grcz11/109/deseq2-all/
+module load MCL
+
+threshold=0.7
+suffix=$( echo $threshold | perl -lane 'print $F[0] * 100' )
+base=all-cor
+mcxload --stream-mirror -abc all-cor-long-70.tsv -o $base-$suffix.mci -write-tab $base-$suffix.tab -tf 'abs()'
+
+mcx query -imx $base-$suffix.mci --vary-correlation -vary-threshold 0.7/1/15
+[mclIO] reading <all-cor-70.mci>
+.......................................
+[mclIO] read native interchange 26007x26007 matrix with 62072692 entries
+-------------------------------------------------------------------------------
+ L       Percentage of nodes in the largest component
+ D       Percentage of nodes in components of size at most 3 [-div option]
+ R       Percentage of nodes not in L or D: 100 - L -D
+ S       Percentage of nodes that are singletons
+ E       Fraction of edges retained (input graph has 62072692)
+ cce     Expected size of component, nodewise [ sum(sz^2) / sum^2(sz) ]
+ EW      Edge weight traits (mean, median and IQR)
+ ND      Node degree traits [mean, median and IQR]
+ CCF     Clustering coefficient (scale 1-100)
+ eff     Induced component efficiency relative to start graph (scale 1-1000)
+Total number of nodes: 26007
+----------------------------------------------------------------------------------------------
+  L   D   R   S     E     cce  EWmean   EWmed   EWiqr  NDmean   NDmed  NDiqr CCF  eff  Cutoff 
+----------------------------------------------------------------------------------------------
+ 99   0   1   0 1.000   25434    0.81    0.81    0.12  2386.8  1569.5 3775.5   -    -     0.70
+ 96   2   1   2 0.900   24044    0.82    0.82    0.11  2147.8  1335.5 3314.0   -    -     0.72
+ 93   5   2   4 0.802   22545    0.84    0.83    0.10  1913.6  1100.5 2838.0   -    -     0.74
+ 90   7   3   6 0.706   21059    0.85    0.84    0.09  1684.7   884.5 2369.5   -    -     0.76
+ 87   9   3   9 0.613   19910    0.86    0.85    0.08  1462.3   683.5 2037.5   -    -     0.78
+ 85  12   3  12 0.523   18657    0.87    0.87    0.07  1248.1   503.5 1779.5   -    -     0.80
+ 81  15   3  14 0.437   17273    0.88    0.88    0.07  1043.8   345.5 1499.5   -    -     0.82
+ 78  19   3  18 0.356   15968    0.89    0.89    0.06   850.2   219.5 1187.5   -    -     0.84
+ 75  22   3  21 0.280   14568    0.91    0.90    0.05   668.5   124.5  847.5   -    -     0.86
+ 70  27   3  27 0.210   12684    0.92    0.92    0.04   501.2    60.5  555.5   -    -     0.88
+ 64  33   3  33 0.147   10719    0.93    0.93    0.03   351.4    23.5  322.8   -    -     0.90
+ 58  40   2  40 0.093    8602    0.94    0.94    0.03   222.5     6.5  147.5   -    -     0.92
+ 48  50   2  50 0.050    5968    0.96    0.96    0.02   118.3     1.5   46.5   -    -     0.94
+ 34  64   2  63 0.019    3046    0.97    0.97    0.01    45.0     0.5    7.5   -    -     0.96
+ 10  83   7  82 0.003     284    0.99    0.98    0.01     7.0     0.5    0.5   -    -     0.98
+----------------------------------------------------------------------------------------------
+```
+
