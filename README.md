@@ -294,7 +294,7 @@ cd $basedir/$dir
 echo "Rscript $gitdir/scripts/create_cor_network.R samples.tsv all.tsv \
 --threshold 0.7 --expansion 2 --inflation 1.4 \
 --output all-cor-long-70.tsv --clusters_file all-cor-long-70-clusters.tsv" > cor.txt
-qsub -t 1 -l h_vmem=128G -o cor.o -e cor.e $gitdir/qsub/rscript-array.sh cor.txt cor
+# qsub -t 1 -l h_vmem=128G -l h_rt=240:0:0 -o cor.o -e cor.e $gitdir/qsub/rscript-array.sh cor.txt cor
 ```
 
 Decide on best value of correlation coeff cut-off to use
@@ -344,6 +344,44 @@ Total number of nodes: 26007
  34  64   2  63 0.019    3046    0.97    0.97    0.01    45.0     0.5    7.5   -    -     0.96
  10  83   7  82 0.003     284    0.99    0.98    0.01     7.0     0.5    0.5   -    -     0.98
 ----------------------------------------------------------------------------------------------
+```
+
+Run MCL clustering for a variety of 
+```
+# run one job per threshold first
+# otherwise jobs will clash all trying to create the same file
+for threshold in 0.8 0.86 0.9
+do
+  threshold_suffix=$( echo $threshold | perl -lane 'print $F[0] * 100' )
+  if [[ ! -e all-cor-long-${threshold_suffix}.tsv ]]; then
+    awk -F"\t" '{if(NR == 1){ print $0 }else{ if($3 > '$threshold' ){ print $0 } }}' all-cor-long-70.tsv > all-cor-long-${threshold_suffix}.tsv
+  fi
+  for INFLATION in 1.4
+  do
+    qsub -o mcl-clustering-$threshold_suffix-$INFLATION.o -e mcl-clustering-$threshold_suffix-$INFLATION.e \
+    $gitdir/qsub/run-mcl-clustering.sh -i $INFLATION \
+    -o all-cor-${threshold_suffix} -t $threshold all-cor-long-${threshold_suffix}.tsv gene-names.tsv
+  done
+done
+
+# run the rest of the jobs with different inflation parameters
+for threshold in 0.8 0.86 0.9
+do
+  threshold_suffix=$( echo $threshold | perl -lane 'print $F[0] * 100' )
+  if [[ ! -e all-cor-long-${threshold_suffix}.tsv ]]; then
+    awk -F"\t" '{if(NR == 1){ print $0 }else{ if($3 > '$threshold' ){ print $0 } }}' all-cor-long-70.tsv > all-cor-long-${threshold_suffix}.tsv
+  fi
+  for INFLATION in 1.8 2.0 2.2 4.0
+  do
+    qsub -o mcl-clustering-$threshold_suffix-$INFLATION.o -e mcl-clustering-$threshold_suffix-$INFLATION.e \
+    $gitdir/qsub/run-mcl-clustering.sh -i $INFLATION \
+    -o all-cor-${threshold_suffix} -t $threshold all-cor-long-${threshold_suffix}.tsv gene-names.tsv
+  done
+done
+
+# check jobs ran successfully
+grep -lE SUCCEEDED mcl-clustering-[89]*o | wc -l
+15
 ```
 
 Also, try pruning edges with k-nearest neighbours
