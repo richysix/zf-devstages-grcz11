@@ -346,3 +346,34 @@ Total number of nodes: 26007
 ----------------------------------------------------------------------------------------------
 ```
 
+Also, try pruning edges with k-nearest neighbours
+```
+mcx query -imx $base-$suffix.mci -vary-knn 100/500/100
+[mclIO] reading <all-cor-70.mci>
+.......................................
+[mclIO] read native interchange 26007x26007 matrix with 62072692 entries
+-------------------------------------------------------------------------------
+ L       Percentage of nodes in the largest component
+ D       Percentage of nodes in components of size at most 3 [-div option]
+ R       Percentage of nodes not in L or D: 100 - L -D
+ S       Percentage of nodes that are singletons
+ E       Fraction of edges retained (input graph has 62072692)
+ cce     Expected size of component, nodewise [ sum(sz^2) / sum^2(sz) ]
+ EW      Edge weight traits (mean, median and IQR)
+ ND      Node degree traits [mean, median and IQR]
+ CCF     Clustering coefficient (scale 1-100)
+ eff     Induced component efficiency relative to start graph (scale 1-1000)
+k-NN     The knn parameter
+Total number of nodes: 26007
+----------------------------------------------------------------------------------------------
+  L   D   R   S     E     cce  EWmean   EWmed   EWiqr  NDmean   NDmed  NDiqr CCF  eff    k-NN 
+----------------------------------------------------------------------------------------------
+ 96   3   1   3 0.076   23898    0.90    0.91    0.10   182.1   143.5  307.5   -    -      500
+ 95   4   1   3 0.059   23504    0.90    0.91    0.09   141.1   107.5  237.5   -    -      400
+ 94   5   1   5 0.043   22819    0.91    0.92    0.09   101.9    74.5  170.5   -    -      300
+ 92   7   1   6 0.027   21777    0.91    0.93    0.08    64.7    44.5  106.5   -    -      200
+ 86  12   1  11 0.013   19369    0.92    0.94    0.07    30.2    20.5   48.5   -    -      100
+----------------------------------------------------------------------------------------------
+```
+
+Try k-NN 400. It keeps ~6% edges and has median node degree ~100
