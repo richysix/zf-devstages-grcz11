@@ -782,3 +782,77 @@ Run rscript job script
 cd $basedir
 qsub -t 1 -o $dir/deseq-all.o -e $dir/deseq-all.e $gitdir/qsub/rscript-array.sh deseq2.txt deseq2
 ```
+
+## Run QoRTS
+
+To create TPM we need transcript lengths and library insert sizes
+Get insert sizes by running QoRTs
+```
+mkdir -p $basedir/qorts $gitdir/qorts
+
+cat deseq2-all/samples.tsv | while read line; do
+  sample=`echo "$line" | awk '{ print $1 }'`
+  group=`echo "$line" | awk '{ print $2 }'`
+  reads=`grep 'input reads' $basedir/star2/$sample/Log.final.out | awk '{ print $6 }'`
+  echo -e "$sample\t$group\t$reads"
+done > $gitdir/qorts/samples.tsv
+cp $gitdir/qorts/samples.tsv $basedir/qorts
+cp $gitdir/qorts/samples.tsv $basedir/star2
+```
+
+Index bam files
+```
+cd star2
+cp ../scripts/indexbam.sh ./
+
+qsub -t 1-${num_tasks} $gitdir/qsub/indexbam-array.sh 
+
+grep -i -E 'succeeded|failed' indexbam-array.sh.o* | awk '{ print $5 }' | sort | uniq -c
+```
+
+Make chromosome-only annotation and BAM files:
+```
+cd $basedir
+paste reference/grcz11/chrName.txt reference/grcz11/chrLength.txt | \
+grep -E '^[0-9]+\b' > $basedir/qorts/chr-sizes.tsv
+
+grep '^[#0-9]' reference/grcz11/Danio_rerio.GRCz11.111.gtf > $basedir/qorts/Danio_rerio.GRCz11.111.chr.gtf
+
+wget https://raw.github.research.its.qmul.ac.uk/bty107/cam-muscle-rnaseq/main/scripts/samtools.sh?token=GHSAT0AAAAAAAAABXZ4OUTZO44T7BUYTUMUZSDIAZQ
+mv samtools.sh\?token\=GHSAT0AAAAAAAAABXZ4OUTZO44T7BUYTUMUZSDIAZQ samtools.sh 
+# edit to load samtools module
+
+dir=qorts
+cd $dir
+# symlink samtools script
+ln -s $gitdir/scripts/samtools.sh samtools.sh
+
+qsub -t 1-${num_tasks} $gitdir/qsub/samtools-array.sh
+
+grep -i -E 'succeeded|failed' samtools-array.sh.[oe]* | awk '{ print $5 }' | sort | uniq -c
+     90 succeeded.
+```
+
+Run jobs
+```
+cp ../scripts/qorts1.sh ./
+
+qsub -t 1-${num_tasks} $gitdir/qsub/qorts1-array.sh
+
+grep -i -E 'succeeded|failed' qorts1-array.sh.[oe]* | awk '{ print $5 }' | sort | uniq -c
+     90 succeeded.
+```
+
+Make decoder file and run QoRTs
+```
+echo -e "unique.ID\tgroup.ID" > $basedir/qorts/decoder.tsv
+cut -f1-2 $basedir/qorts/samples.tsv | sort >> $basedir/qorts/decoder.tsv
+mkdir -p $basedir/qorts/output
+
+cd $gitdir/scripts
+wget https://raw.github.research.its.qmul.ac.uk/bty107/cam-muscle-rnaseq/main/scripts/qorts2.R?token=GHSAT0AAAAAAAAABXZ5DF5MASJWKFC2UFTEZSDM7PA
+mv qorts2.R\?token\=GHSAT0AAAAAAAAABXZ5DF5MASJWKFC2UFTEZSDM7PA qorts2.R
+
+qsub $gitdir/qsub/qorts2.sh
+```
+
