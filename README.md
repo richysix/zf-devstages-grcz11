@@ -584,3 +584,201 @@ Rerun parse_mcl_output.pl on 2.2 clustering and remove clusters smaller then 5
 ```
 qsub ../qsub/parse_mcl_clustering-2-2-min-size-5.sh
 ```
+
+--------------------------------------------------------------------------------
+
+## Redo for e111
+
+### Set up
+
+```
+export version=111
+export gitdir=$HOME/checkouts/zf-devstages-grcz11
+export basedir=/data/scratch/$USER/zf-stages-grcz11/$version
+
+screen -S zfstages-111
+```
+
+Link to current copy of genome and download annotation
+```
+mkdir reference
+ln -s /data/scratch/bty114/genomes/GRCz11/grcz11 reference/grcz11
+cd reference/grcz11/
+wget ftp://ftp.ensembl.org/pub/release-111/gtf/danio_rerio/Danio_rerio.GRCz11.111.gtf.gz
+```
+
+## Download FASTQ data
+
+Download project data from ENA:
+```
+cd $basedir
+project=PRJEB12982
+fields="secondary_sample_accession,run_accession,fastq_md5,fastq_ftp,sample_alias,sample_description"
+curl -SsL "https://www.ebi.ac.uk/ena/portal/api/filereport?accession=$project&result=read_run&fields=$fields&format=tsv" \
+> ena.tsv
+```
+
+Download sample info from Figshare
+```
+wget https://figshare.com/ndownloader/files/21662469
+mv 21662469 zfs-rnaseq-samples.tsv
+```
+
+Join sample info to ENA info
+```
+# header
+head -1 ena.tsv | sed -e 's|secondary_sample_accession|accession_number|' | \
+join -t$'\t' -1 3 <( head -1 zfs-rnaseq-samples.tsv ) - > ena-sample-names.tsv
+# samples
+join -t$'\t' -1 3 <( sort -t$'\t' -k3,3 zfs-rnaseq-samples.tsv ) <( sort -t$'\t' -k1,1 ena.tsv ) | \
+sort -t$'\t' -k4,4 >> ena-sample-names.tsv
+```
+
+Create download files
+```
+dir=fastq
+mkdir $dir
+cut -f11 ena-sample-names.tsv | grep -v fastq_ftp | sed -e 's|;|\n|' | \
+sed -e 's|^\(.*/\)\(.*\)$|\1\2\t\2|' > $dir/curl
+split -l72 -d $dir/curl $dir/curl.
+rename $dir/curl.0 $dir/curl. $dir/curl.*
+num_tasks=$( find $dir -type f -name "curl.*" | wc -l )
+mv $dir/curl.0 $dir/curl.${num_tasks}
+rm $dir/curl
+cd $dir
+```
+
+Run curl job as array job  
+`curl-file-download.sh` is in the `scripts` directory
+```
+qsub -t 1-${num_tasks} $gitdir/qsub/curl-file-download-array.sh
+```
+
+### Check md5sums  
+Create a file of checksums and filenames
+```
+paste <(cut -f10 ../ena-sample-names.tsv | sed -e 's/;/\n/') \
+<(cut -f11 ../ena-sample-names.tsv | sed -e 's/;/\n/') | \
+grep -v fastq_ftp | sed -e 's|\t.*/|  |' > md5sum.txt
+```
+
+Run check-md5sum job
+```
+cd $basedir/$dir
+qsub ../qsub/check-md5sums.sh
+```
+
+Check there are no lines in md5sum.out  
+Lines are only output if the checksum doesn't match
+```
+wc -l md5sum.out 
+0 md5sum.out
+```
+
+## Run STAR
+
+Create file of samples to fastq files
+```
+cd ..
+dir=star1
+mkdir -p $dir
+grep -v 'accession_number' ena-sample-names.tsv | perl -ane 'push @{$h{$F[6]}}, $F[8]; END { foreach my $k (keys %h)
+{ printf "%s\t%s\t%s\n", $k, (join ",", map { "../fastq/${_}_1.fastq.gz" } sort @{$h{$k}}), (join ",", map { "../fastq/${_}_2.fastq.gz" } sort 
+@{$h{$k}}) } }' | \
+sort -V > $dir/fastq.tsv
+```
+
+Run all samples as array job
+```
+cd $basedir/$dir
+# symlink star1 script
+ln -s $gitdir/scripts/star1.sh star1.sh
+# run job
+num_tasks=$( wc -l fastq.tsv | awk '{ print $1 }' )
+qsub -t 1-${num_tasks} $gitdir/qsub/star1-array.sh
+```
+
+Check whether they succeeded or failed
+```
+grep -i -E 'succeeded|failed' star1-array.sh.o* | awk '{ print $5 }' | sort | uniq -c
+     90 succeeded.
+cd ..
+```
+
+### Remap using discovered splice junctions
+
+Copy file of fastq files to star2 directory
+```
+cd $basedir
+dir=star2
+mkdir -p $dir
+cp star1/fastq.tsv $dir
+```
+
+Run STAR as array job
+```
+cd $dir
+# symlink star2 script
+ln -s $gitdir/scripts/star2.sh star2.sh
+
+qsub -t 1-${num_tasks} $gitdir/qsub/star2-array.sh
+```
+
+Check jobs completed
+```
+grep -i -E 'succeeded|failed' star2-array.sh.o* | awk '{ print $5 }' | sort | uniq -c
+     90 SUCCEEDED.
+```
+Check error files
+```
+cat star2-array.sh.e* | wc -l
+0
+```
+
+#### Create file of discovered splice junctions
+
+```
+cat $( find ../star1 | grep SJ.out.tab$ ) | \
+cut -f1-4 | sort -u -k1,4 > SJ.star1-all.out.tab
+
+cat $( find ./ | grep SJ.out.tab$ ) | \
+cut -f1-4 | sort -u -k1,4 > SJ.star2-all.out.tab
+```
+
+## DESeq2
+
+Get Ensembl e111 annotation
+```
+cd $basedir
+mkdir $basedir/annotation
+qsub qsub/get_ensembl_gene_annotation.sh -e $version -s 'Danio rerio' \
+-o annotation/annotation.txt -f scripts/get_ensembl_gene_annotation.pl
+```
+
+### Run DESeq2 to get normalised counts
+
+Run DESeq2 with samples divided into Maternal and Zygotic. Split is irrelevant,
+but the DESeq2 script requires two conditions to run.
+
+Create samples file
+```
+dir=deseq2-all
+mkdir $dir
+awk -F"\t" '{ print $7 "\t" $6 }' zfs-rnaseq-samples.tsv | grep -v sampleName > $dir/samples.tsv
+```
+
+Create file of commands to run with Rscript
+```
+con=$( cut -f4,6 zfs-rnaseq-samples.tsv | grep -v condition | uniq | sed -e 's|ZFS:0*||' | \
+awk '{if($1 <= 11){ print $2 }}' | tr '\n' ',' | sed -e 's|,$||' )
+exp=$( cut -f4,6 zfs-rnaseq-samples.tsv | grep -v condition | uniq | sed -e 's|ZFS:0*||' | \
+awk '{if($1 > 11){ print $2 }}' | tr '\n' ',' | sed -e 's|,$||' )
+echo "Rscript $gitdir/scripts/deseq2.R -s $dir/samples.tsv -e $exp -c $con \
+-a $basedir/annotation/annotation.txt -d $basedir/star2 -o $dir" > deseq2.txt
+```
+
+Run rscript job script
+```
+cd $basedir
+qsub -t 1 -o $dir/deseq-all.o -e $dir/deseq-all.e $gitdir/qsub/rscript-array.sh deseq2.txt deseq2
+```
