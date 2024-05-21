@@ -956,3 +956,16 @@ grep -i -E 'job salmon.*(succeeded|failed)' salmon-array.sh.[oe]* | awk '{ print
      90 succeeded.
 ```
 
+### Convert counts to FPKM and TPM
+
+Create FPKM and TPM from counts
+```
+Rscript ~/checkouts/bioinf-gen/counts-to-fpkm-tpm.R \
+--transcripts_file ../reference/grcz11/Danio_rerio.GRCz11.111.transcripts.tsv \
+--qorts_file ../qorts/output/summary.table.txt --fpkm --tpm \
+--output_base zf-stages.GRCz11.e111.all samples.tsv all.tsv 
+```
+
+Create README for Figshare and upload files
+doi.org/10.6084/m9.figshare.25858966
+
