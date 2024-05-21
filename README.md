@@ -856,3 +856,103 @@ mv qorts2.R\?token\=GHSAT0AAAAAAAAABXZ5DF5MASJWKFC2UFTEZSDM7PA qorts2.R
 qsub $gitdir/qsub/qorts2.sh
 ```
 
+## FPKM and TPM
+
+### Run Salmon
+
+Download fasta file
+```
+cd $basedir/reference/grcz11
+wget https://ftp.ensembl.org/pub/release-111/fasta/danio_rerio/cdna/Danio_rerio.GRCz11.cdna.all.fa.gz
+gunzip Danio_rerio.GRCz11.cdna.all.fa.gz
+```
+
+Create transcriptome with chr decoys
+```
+# remove version numbers from transcripts
+sed -e 's|\(>ENSDART[0-9]*\)\.[0-9]* cdna .*|\1|' \
+Danio_rerio.GRCz11.cdna.all.fa > Danio_rerio.GRCz11.cdna.all.edited.fa 
+# cat to genome
+cat Danio_rerio.GRCz11.cdna.all.edited.fa ../Danio_rerio.GRCz11.dna_sm.primary_assembly.fa | gzip -c > Danio_rerio.GRCz11.cdna.edited.chr.fa.gz
+grep '>' ../Danio_rerio.GRCz11.dna_sm.primary_assembly.fa | cut -d " " -f1 | sed -e 's|^>||' > decoys.txt
+```
+
+Index transcriptome
+```
+qsub $gitdir/qsub/salmon_index.sh -f decoys.txt -k 31 -p 4 \
+Danio_rerio.GRCz11.cdna.edited.chr.fa.gz Danio_rerio.GRCz11.salmon
+```
+
+jobstats -j 3566686
+
+                                                        INFORMATION FOR JOB NUMBER 3566686 (LAST 25 TASKS FOR ARRAY JOB)
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| JOB ID [TASK] |    NAME    |     SUBMITTED     |      STARTED      |       ENDED       |  TIME REQ |  DURATION | MEM R |  MEM U  | CORES | GPU |  
+QUEUE  |  HOST  | STATUS |  EFF |
++---------------+------------+-------------------+-------------------+-------------------+-----------+-----------+-------+---------+-------+-----+---------+--------+--------+------+
+| 3566686       | salmon_ind | 15/05/24 12:10:14 | 15/05/24 12:10:17 | 15/05/24 12:26:02 |  01:00:00 |   0:15:45 |   16G |   8.75G |     4 |   - | 
+short.q | ddy176 |      0 |  73% |
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Map and quantify with salmon
+```
+mkdir salmon
+cp star1/fastq.tsv salmon/
+cd salmon
+
+qsub $gitdir/scripts/salmon.sh -g $basedir/reference/grcz11/Danio_rerio.GRCz11.111.gtf -i $basedir/reference/grcz11/Danio_rerio.GRCz11.salmon -l ISR 
+1
+```
+
+Transcript ids in fasta file don't match transcript ids in GTF file because of version numbers.
+Also, transcripts on alternate sequence aren't present in the GTF file so aren't matched to a gene id
+For now, remove alt seq transcripts
+```
+# python script to filter sequences based on id
+python ~/checkouts/bioinf-gen/filter-fasta-no-biopy.py \
+--output_file Danio_rerio.GRCz11.cdna.no-alt.fa \
+--filter_file alt_seqs_to_remove.txt \
+--filter_type remove Danio_rerio.GRCz11.cdna.all.fa
+# remove transcript version numbers
+sed -e 's|\.[0-9]*$||' \
+Danio_rerio.GRCz11.cdna.no-alt.fa > Danio_rerio.GRCz11.cdna.no-alt.no-version.fa 
+```
+
+Add genome sequence as decoy and index
+```
+cat Danio_rerio.GRCz11.cdna.no-alt.no-version.fa ../Danio_rerio.GRCz11.dna_sm.primary_assembly.fa | gzip -c > 
+Danio_rerio.GRCz11.cdna.no-alt.no-version.edited.chr.fa.gz
+```
+
+Index transcriptome
+```
+qsub $gitdir/qsub/salmon_index.sh -f decoys.txt -k 31 -p 4 \
+Danio_rerio.GRCz11.cdna.no-alt.no-version.edited.chr.fa.gz Danio_rerio.GRCz11.salmon.no-alt
+jobstats -j 3569824 
+
+                                                        INFORMATION FOR JOB NUMBER 3569824 (LAST 25 TASKS FOR ARRAY JOB)
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| JOB ID [TASK] |    NAME    |     SUBMITTED     |      STARTED      |       ENDED       |  TIME REQ |  DURATION | MEM R |  MEM U  | CORES | GPU |  
+QUEUE  |  HOST  | STATUS |  EFF |
++---------------+------------+-------------------+-------------------+-------------------+-----------+-----------+-------+---------+-------+-----+---------+--------+--------+------+
+| 3569824       | salmon_ind | 16/05/24 11:01:16 | 16/05/24 11:01:18 | 16/05/24 11:18:21 |  01:00:00 |   0:17:03 |   16G |   8.75G |     4 |   - | 
+short.q | ddy173 |      0 |  73% |
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+```
+
+Map and quantify with salmon
+```
+mkdir salmon
+cp star1/fastq.tsv salmon/
+cd salmon
+cp $gitdir/scripts/salmon.sh ./
+num_tasks=$( wc -l fastq.tsv | awk '{ print $1 }' )
+
+qsub -t 1-${num_tasks} $gitdir/qsub/salmon-array.sh -l ISR \
+-g $basedir/reference/grcz11/Danio_rerio.GRCz11.111.gtf \
+-i $basedir/reference/grcz11/Danio_rerio.GRCz11.salmon.no-alt
+
+grep -i -E 'job salmon.*(succeeded|failed)' salmon-array.sh.[oe]* | awk '{ print $5 }' | sort | uniq -c
+     90 succeeded.
+```
+
