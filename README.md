@@ -379,6 +379,43 @@ do
   done
 done
 
+for threshold in 0.8 0.86 0.9
+do
+  threshold_suffix=$( echo $threshold | perl -lane 'print $F[0] * 100' )
+  echo $threshold
+  clm info all-cor-$threshold_suffix.mci all-cor-$threshold_suffix.mci.I[0-9]-[0-9]
+done
+0.8
+efficiency=0.43917 massfrac=0.93145 areafrac=0.08476  source=all-cor-80.mci.I1-4 clusters=8467 max=6848  ctr=2486.1 avg=3.5 min=1 DGI=6848 TWI=3 TWL=2106 sgl=8076 qrt=8312
+===
+efficiency=0.48883 massfrac=0.88921 areafrac=0.06055  source=all-cor-80.mci.I1-8 clusters=8616 max=6141  ctr=1776.4 avg=3.4 min=1 DGI=6141 TWI=7 TWL=671 sgl=8078 qrt=8408
+===
+efficiency=0.50045 massfrac=0.87969 areafrac=0.05761  source=all-cor-80.mci.I2-0 clusters=8683 max=5981  ctr=1690.2 avg=3.4 min=1 DGI=5981 TWI=7 TWL=668 sgl=8082 qrt=8456
+===
+efficiency=0.51833 massfrac=0.86358 areafrac=0.05296  source=all-cor-80.mci.I2-2 clusters=8732 max=5856  ctr=1553.8 avg=3.4 min=1 DGI=5856 TWI=9 TWL=486 sgl=8081 qrt=8483
+===
+efficiency=0.58919 massfrac=0.77489 areafrac=0.03836  source=all-cor-80.mci.I4-0 clusters=9249 max=5096  ctr=1125.6 avg=3.2 min=1 DGI=5096 TWI=30 TWL=68 sgl=8163 qrt=8885
+0.86
+efficiency=0.50980 massfrac=0.95017 areafrac=0.05115  source=all-cor-86.mci.I1-4 clusters=12178 max=5346  ctr=1500.6 avg=2.4 min=1 DGI=5346 TWI=10 TWL=95 sgl=11792 qrt=12004
+===
+efficiency=0.56456 massfrac=0.89814 areafrac=0.03156  source=all-cor-86.mci.I1-8 clusters=12371 max=4709  ctr=926.3 avg=2.4 min=1 DGI=4709 TWI=55 TWL=22 sgl=11792 qrt=12115
+===
+efficiency=0.57908 massfrac=0.88667 areafrac=0.02919  source=all-cor-86.mci.I2-0 clusters=12461 max=4539  ctr=856.9 avg=2.4 min=1 DGI=4539 TWI=76 TWL=18 sgl=11793 qrt=12177
+===
+efficiency=0.59041 massfrac=0.87518 areafrac=0.02724  source=all-cor-86.mci.I2-2 clusters=12535 max=4306  ctr=799.6 avg=2.3 min=1 DGI=4306 TWI=98 TWL=16 sgl=11796 qrt=12223
+===
+efficiency=0.66028 massfrac=0.78957 areafrac=0.01650  source=all-cor-86.mci.I4-0 clusters=13194 max=3506  ctr=484.8 avg=2.2 min=1 DGI=3506 TWI=362 TWL=6 sgl=11877 qrt=12714
+0.9
+efficiency=0.20067 massfrac=0.90552 areafrac=0.16022  source=all-cor-90.mci.I1-4 clusters=417 max=6384  ctr=2876.5 avg=43.0 min=2 DGI=413 TWI=2 TWL=1888 sgl=0 qrt=230
+===
+efficiency=0.28103 massfrac=0.83654 areafrac=0.10388  source=all-cor-90.mci.I1-8 clusters=634 max=5070  ctr=1865.4 avg=28.3 min=1 DGI=619 TWI=3 TWL=1206 sgl=1 qrt=363
+===
+efficiency=0.31514 massfrac=0.80634 areafrac=0.08881  source=all-cor-90.mci.I2-0 clusters=724 max=4700  ctr=1594.8 avg=24.8 min=1 DGI=695 TWI=4 TWL=906 sgl=1 qrt=409
+===
+efficiency=0.34957 massfrac=0.77595 areafrac=0.07253  source=all-cor-90.mci.I2-2 clusters=816 max=4184  ctr=1302.6 avg=22.0 min=1 DGI=759 TWI=6 TWL=558 sgl=4 qrt=477
+===
+efficiency=0.46231 massfrac=0.62436 areafrac=0.05033  source=all-cor-90.mci.I4-0 clusters=1639 max=3656  ctr=904.3 avg=11.0 min=1 DGI=1283 TWI=20 TWL=84 sgl=115 qrt=1096
+
 # check jobs ran successfully
 grep -lE SUCCEEDED mcl-clustering-[89]*o | wc -l
 15
@@ -417,19 +454,51 @@ Total number of nodes: 26007
 Try k-NN 400. It keeps ~6% edges and has median node degree ~100
 
 ```
-knn_threshold=400
-threshold=0.7
-threshold_suffix=$( echo $threshold | perl -lane 'print $F[0] * 100' )
-for INFLATION in 1.8 2.0 2.2 4.0
-do
-  qsub -o mcl-clustering-$threshold_suffix-knn${knn_threshold}-$INFLATION.o \
-  -e mcl-clustering-$threshold_suffix-knn${knn_threshold}-$INFLATION.e \
-  $gitdir/qsub/run-mcl-clustering.sh -i $INFLATION \
-  -o all-cor-${threshold_suffix}-knn${knn_threshold} -t $threshold all-cor-long-${threshold_suffix}.tsv gene-names.tsv
-done
-```
+qlogin -l h_vmem=8G
 
-```
+cd /data/scratch/bty114/zf-stages-grcz11/109/deseq2-all
+module load MCL
+
+threshold=0.7
+suffix=$( echo $threshold | perl -lane 'print $F[0] * 100' )
+base=all-cor
+
+mcx query -imx $base-$suffix.mci -vary-knn 100/500/100
+[mclIO] reading <all-cor-70.mci>
+.......................................
+[mclIO] read native interchange 26007x26007 matrix with 62072692 entries
+-------------------------------------------------------------------------------
+ L       Percentage of nodes in the largest component
+ D       Percentage of nodes in components of size at most 3 [-div option]
+ R       Percentage of nodes not in L or D: 100 - L -D
+ S       Percentage of nodes that are singletons
+ E       Fraction of edges retained (input graph has 62072692)
+ cce     Expected size of component, nodewise [ sum(sz^2) / sum^2(sz) ]
+ EW      Edge weight traits (mean, median and IQR)
+ ND      Node degree traits [mean, median and IQR]
+ CCF     Clustering coefficient (scale 1-100)
+ eff     Induced component efficiency relative to start graph (scale 1-1000)
+k-NN     The knn parameter
+Total number of nodes: 26007
+----------------------------------------------------------------------------------------------
+  L   D   R   S     E     cce  EWmean   EWmed   EWiqr  NDmean   NDmed  NDiqr CCF  eff    k-NN 
+----------------------------------------------------------------------------------------------
+ 96   3   1   3 0.076   23898    0.90    0.91    0.10   182.1   143.5  307.5   -    -      500
+ 95   4   1   3 0.059   23504    0.90    0.91    0.09   141.1   107.5  237.5   -    -      400
+ 94   5   1   5 0.043   22819    0.91    0.92    0.09   101.9    74.5  170.5   -    -      300
+ 92   7   1   6 0.027   21777    0.91    0.93    0.08    64.7    44.5  106.5   -    -      200
+ 86  12   1  11 0.013   19369    0.92    0.94    0.07    30.2    20.5   48.5   -    -      100
+---------------------------------------------------------------------------------------------
+
+knn_threshold=400
+mcx alter -imx $base-$suffix.mci -tf "abs(),#knn($knn_threshold)" -o $base-$suffix-knn${knn_threshold}.mci
+
+for INFLATION in 1.4 1.6 2.0 4.0
+do
+INFLATION_SUFFIX=$( echo $INFLATION | perl -lane 'print $F[0] * 10' )
+mcl $base-$suffix-knn${knn_threshold}.mci -I ${INFLATION} -o $base-$suffix-knn${knn_threshold}.mci.I${INFLATION_SUFFIX}
+done
+
 clm info all-cor-70-knn400.mci all-cor-70-knn400.mci.I[0-9][0-9]
 efficiency=0.15629 massfrac=0.83000 areafrac=0.07443  source=all-cor-70-knn400.mci.I14 clusters=1384 max=4108  ctr=1936.5 avg=18.8 min=1 DGI=1330 TWI=4 TWL=2371 sgl=907 qrt=1127
 ===
@@ -438,4 +507,80 @@ efficiency=0.19235 massfrac=0.77197 areafrac=0.04415  source=all-cor-70-knn400.m
 efficiency=0.27028 massfrac=0.66856 areafrac=0.01725  source=all-cor-70-knn400.mci.I20 clusters=2261 max=1287  ctr=449.6 avg=11.5 min=1 DGI=1157 TWI=18 TWL=516 sgl=1026 qrt=1797
 ===
 efficiency=0.26274 massfrac=0.34114 areafrac=0.00248  source=all-cor-70-knn400.mci.I40 clusters=7212 max=411  ctr=65.5 avg=3.6 min=1 DGI=411 TWI=255 TWL=14 sgl=4384 qrt=6518
+
+```
+
+Forgot to subtract the correlation threshold. Redo
+```
+qlogin -l h_vmem=8G
+
+cd /data/scratch/bty114/zf-stages-grcz11/109/deseq2-all/
+module load MCL
+
+knn_threshold=400
+threshold=0.7
+threshold_suffix=$( echo $threshold | perl -lane 'print $F[0] * 100' )
+
+OUTPUT_BASE=all-cor-${threshold_suffix}-knn${knn_threshold}
+mcxload --stream-mirror -abc all-cor-long-${threshold_suffix}.tsv \
+-o $OUTPUT_BASE.mci -write-tab $OUTPUT_BASE.tab -tf "abs(),#knn($knn_threshold),add(-$threshold)"
+# exit
+^D
+
+# run clustering 
+for INFLATION in 1.4 1.6 1.8 2.0 2.2 4.0
+do
+  qsub -o mcl-clustering-$threshold_suffix-knn${knn_threshold}-$INFLATION.o \
+  -e mcl-clustering-$threshold_suffix-knn${knn_threshold}-$INFLATION.e \
+  $gitdir/qsub/run-mcl-clustering.sh -i $INFLATION \
+  -o all-cor-${threshold_suffix}-knn${knn_threshold} -t $threshold all-cor-long-${threshold_suffix}.tsv gene-names.tsv
+done
+
+# number of nodes in clusters of size > 99
+for INFLATION in 1.4 1.6 1.8 2.0 2.2 4.0
+do
+  INFLATION_SUFFIX=$( echo $INFLATION | sed -e 's|\.|-|' )
+  cut -f3 all-cor-70-knn400.mci.I${INFLATION_SUFFIX}.tsv | uniq -c | sort -grk1,2 | \
+  awk 'BEGIN{sum = 0} {if($1 > 99){ sum = sum + $1 }} END{ print sum }' 
+done
+20141
+19000
+18117
+16737
+15196
+3939
+
+# number of nodes in clusters of size > 4
+for INFLATION in 1.4 1.6 1.8 2.0 2.2 4.0
+do
+  INFLATION_SUFFIX=$( echo $INFLATION | sed -e 's|\.|-|' )
+  cut -f3 all-cor-70-knn400.mci.I${INFLATION_SUFFIX}.tsv | uniq -c | sort -grk1,2 | \
+  awk 'BEGIN{sum = 0} {if($1 > 4){ sum = sum + $1 }} END{ print sum }' 
+done
+22910
+22507
+22176
+21442
+20509
+12296
+```
+
+```
+clm info all-cor-70-knn400.mci all-cor-70-knn400.mci.I[0-9]-[0-9]
+efficiency=0.29987 massfrac=0.83982 areafrac=0.05446  source=all-cor-70-knn400.mci.I1-4 clusters=6139 max=3596  ctr=1597.8 avg=4.8 min=1 DGI=3596 TWI=5 TWL=1433 sgl=5547 qrt=5882
+===
+efficiency=0.32930 massfrac=0.79819 areafrac=0.03286  source=all-cor-70-knn400.mci.I1-6 clusters=6354 max=2264  ctr=964.5 avg=4.6 min=1 DGI=2264 TWI=9 TWL=1004 sgl=5548 qrt=6029
+===
+efficiency=0.36753 massfrac=0.74634 areafrac=0.01759  source=all-cor-70-knn400.mci.I1-8 clusters=6547 max=1428  ctr=516.6 avg=4.5 min=1 DGI=1428 TWI=16 TWL=467 sgl=5558 qrt=6155
+===
+efficiency=0.39474 massfrac=0.70847 areafrac=0.01267  source=all-cor-70-knn400.mci.I2-0 clusters=6911 max=1049  ctr=372.6 avg=4.2 min=1 DGI=1049 TWI=23 TWL=244 sgl=5639 qrt=6490
+===
+efficiency=0.41563 massfrac=0.67331 areafrac=0.00968  source=all-cor-70-knn400.mci.I2-2 clusters=7480 max=886  ctr=284.7 avg=3.9 min=1 DGI=886 TWI=33 TWL=151 sgl=5939 qrt=7050
+===
+efficiency=0.42246 massfrac=0.43981 areafrac=0.00147  source=all-cor-70-knn400.mci.I4-0 clusters=14156 max=452  ctr=44.0 avg=2.1 min=1 DGI=452 TWI=1317 TWL=3 sgl=11130 qrt=13544
+```
+
+Rerun parse_mcl_output.pl on 2.2 clustering and remove clusters smaller then 5
+```
+qsub ../qsub/parse_mcl_clustering-2-2-min-size-5.sh
 ```

@@ -26,6 +26,7 @@ OPTIONS="Options:
     -i    Inflation value [default: 1.4]
     -o    Output basename [default: input file name minus .tsv]
     -t    Edge weight threshold [default: 0.85]
+    -c    Cluster size threshold
     -d    print debugging info
     -v    verbose output
     -q    turn verbose output off
@@ -36,12 +37,14 @@ debug=0
 verbose=1
 INFLATION=1.4
 THRESHOLD=0.85
+CLUSTER_SIZE_THRESHOLD=1
 
-while getopts ":i:o:t:dhqv" opt; do
+while getopts ":i:o:t:c:dhqv" opt; do
   case $opt in
     i)  INFLATION=$OPTARG  ;;
     o)  OUTPUT_BASE=$OPTARG  ;;
     t)  THRESHOLD=$OPTARG  ;;
+    c)  CLUSTER_SIZE_THRESHOLD=$OPTARG  ;;
     d)  debug=1  ;;
     h)  usage "" ;;
     v)  verbose=1 ;;
@@ -77,7 +80,7 @@ error_checking $SUCCESS "mcl SUCCEEDED." "mcl FAILED: $SUCCESS"
 # make unique ID so that jobs run concurrently don't clash
 uid=$( echo $RANDOM | md5sum | head -c 6 )
 head -n1 $GENE_NAME_FILE > gene-info-$uid.tsv
-join -t$'\t' <( sort -t$'\t' -k1,1 gene-names.tsv ) \
+join -t$'\t' <( sort -t$'\t' -k1,1 $GENE_NAME_FILE ) \
 <( awk '{print $2}' $OUTPUT_BASE.tab | sort -u ) >> gene-info-$uid.tsv
 
 # PARSE THE OUTPUT
@@ -86,10 +89,11 @@ perl ~/checkouts/bioinf-gen/parse_mcl_output.pl \
 --info_file gene-info-$uid.tsv \
 --info_file_node_id_col 1 \
 --info_file_node_name_col 2 \
---graphml_file $OUTPUT_BASE.mci.I${INFLATION_SUFFIX}.graphml \
+--graphml_file $OUTPUT_BASE.mci.I${INFLATION_SUFFIX}-min${CLUSTER_SIZE_THRESHOLD}.graphml \
+--cluster_size_threshold $CLUSTER_SIZE_THRESHOLD \
 $OUTPUT_BASE.tab $OUTPUT_BASE.mci \
 $OUTPUT_BASE.mci.I${INFLATION_SUFFIX} \
-$OUTPUT_BASE.mci.I${INFLATION_SUFFIX}.tsv
+$OUTPUT_BASE.mci.I${INFLATION_SUFFIX}-min${CLUSTER_SIZE_THRESHOLD}.tsv
 
 # remove gene info file
 rm gene-info-$uid.tsv
