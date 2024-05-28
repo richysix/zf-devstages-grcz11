@@ -969,3 +969,26 @@ Rscript ~/checkouts/bioinf-gen/counts-to-fpkm-tpm.R \
 Create README for Figshare and upload files
 doi.org/10.6084/m9.figshare.25858966
 
+## Archive mapped bams
+
+Make file of bam files names with ZFS stage cram file names
+```
+cut -f4,7 zfs-rnaseq-samples.tsv | grep -v condition | \
+sed -e 's|-\([1-5]\)$|-\1\t\1|; s|ZFS:|zfs-|; s|00000||;' | \
+awk -F"\t" '{ bam="star2/" $2 "/Aligned.sortedByCoord.out.bam"
+ref="'$SCRATCH'" "/zf-stages-grcz11/111/reference/Danio_rerio.GRCz11.dna_sm.primary_assembly.fa"
+cram="star2/" $1 "-" $3 ".cram" 
+print bam "\t" ref "\t" cram }' > bam2cram.txt
+```
+
+Run bam2cram array job
+```
+# copy bam2cram scripts
+cp ~/checkouts/uge-job-scripts/bam2cram.sh scripts/
+cp ~/checkouts/uge-job-scripts/bam2cram-array.sh qsub/
+ln -s scripts/bam2cram.sh bam2cram.sh
+qsub -t 1-90 qsub/bam2cram-array.sh bam2cram.txt
+
+grep -ihE 'SUCCEEDED|FAILED' bam2cram-array.sh.[oe]* | awk '{print $3}' | sort | uniq -c
+     90 SUCCEEDED.
+```
